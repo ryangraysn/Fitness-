@@ -1,0 +1,101 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #f4f4f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        input, button {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h2>{{ username }}'s Workouts</h2>
+            <a href="/logout">Logout</a>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %} <p style="color: green;">{{ messages[0] }}</p> {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <label>Set</label> <input type="number" name="Set" required>
+            <label>Reps</label> <input type="number" name="Reps" required>
+            <label>Weight</label> <input type="number" name="Weight" required>
+            <label>Body Weight</label> <input type="number" name="Body_Weight" required>
+            <label>Date</label> <input type="date" name="Date" required>
+            <label>Tonnage (Optional)</label> <input type="number" name="Tonnage">
+            <button type="submit">Log Workout</button>
+        </form>
+
+        <h3>Your Past Logs</h3>
+        <table>
+            <tr>
+                <th>Date</th>
+                <th>Set</th>
+                <th>Reps</th>
+                <th>Weight</th>
+            </tr>
+            {% for w in workouts %}
+            <tr>
+                <td>{{ w.Date }}</td>
+                <td>{{ w.Set }}</td>
+                <td>{{ w.Reps }}</td>
+                <td>{{ w.Weight }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4">No workouts logged yet.</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+
+</body>
+</html>
