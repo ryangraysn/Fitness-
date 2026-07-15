@@ -52,6 +52,19 @@
         th {
             background-color: #f2f2f2;
         }
+
+        .graph-container {
+            margin-top: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+            .graph-container img {
+                width: 100%;
+                max-width: 100%;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+            }
     </style>
 </head>
 <body>
@@ -66,15 +79,22 @@
         {% if messages %} <p style="color: green;">{{ messages[0] }}</p> {% endif %}
         {% endwith %}
 
-        <form method="POST">
-            <label>Set</label> <input type="number" name="Set" required>
-            <label>Reps</label> <input type="number" name="Reps" required>
-            <label>Weight</label> <input type="number" name="Weight" required>
-            <label>Body Weight</label> <input type="number" name="Body_Weight" required>
-            <label>Date</label> <input type="date" name="Date" required>
-            <label>Tonnage (Optional)</label> <input type="number" name="Tonnage">
-            <button type="submit">Log Workout</button>
-        </form>
+                          <form method="POST">
+                              <label>Date</label> <input type="date" name="Date" required>
+                              <label>Set</label> <input type="number" name="Set" required>
+                              <label>Reps</label> <input type="number" name="Reps" required>
+                              <label>Weight</label> <input type="number" name="Weight" required>
+                              <label>Body Weight</label> <input type="number" name="Body_Weight" required>
+
+
+                              <button type="submit">Log Workout</button>
+                          </form>
+
+        <!-- ADDED: This section calls the /tonnage_plot route to display the graph -->
+        <div class="graph-container">
+            <h3>Tonnage Over Time</h3>
+            <img src="/tonnage_plot" alt="Tonnage Graph">
+        </div>
 
         <h3>Your Past Logs</h3>
         <table>
