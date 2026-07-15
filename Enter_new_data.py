@@ -1,22 +1,30 @@
 import sqlite3
+from datetime import datetime
 
-def log_workout(set, weight, reps, weight, body_weight, date, tonnage, relative_intensity, wilks_tonnage, wilks_relative_intensity, one_rep_max):
-        # Code to validate input data #
+def log_workout(set_value, weight, reps, date, body_weight):
 
-        if set <=0:
-            raise ValueError("Sets must be greater than 0")
-        if weight <=0:
-            raise ValueError("Weight must be greater than 0")
-        if reps<=0:
-            raise ValueError("Reps must be greater than 0")
-        if date <=0:
-            raise ValueError("Date must be greater than 0")
-        
-        # Code to connect to the database and insert the workout data #
+    if set_value <= 0:
+        raise ValueError("Set must be greater than 0")
+    if weight <= 0:
+        raise ValueError("Weight must be greater than 0")
+    if reps <= 0:
+        raise ValueError("Reps must be greater than 0")
+    if body_weight <= 0:
+        raise ValueError("Body weight must be greater than 0")
 
-        with sqlite3.connect('#insert file name#') as conn:
-            cursor = conn.cursor()
-            # execute SQL here
-            cursor.execute("INSERT INTO workouts (set, weight, reps, body_weight, date, tonnage, relative_intensity, wilks_tonnage, wilks_relative_intensity, one_rep_max) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (set, weight, reps, body_weight, date, tonnage, relative_intensity, wilks_tonnage, wilks_relative_intensity, one_rep_max))
-        
+    try:
+        datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError("Date must be YYYY-MM-DD")
 
+    with sqlite3.connect("Fitness_Database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO "Movement Table" ("Set", Reps, Weight, Body_Weight, Date) VALUES (?, ?, ?, ?, ?)',
+            (set_value, reps, weight, body_weight, date)
+        )
+        conn.commit()
+
+
+if __name__ == "__main__":
+    log_workout(1, 135, 8, "2026-03-03", 180)
