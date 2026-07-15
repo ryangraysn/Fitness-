@@ -8,6 +8,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime
+import re
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key_change_this_in_production" # Required for sessions
@@ -17,7 +18,7 @@ DB_URL = 'sqlite:///Fitness_Database.db'
 engine = create_engine(DB_URL)
 metadata = MetaData()
 
-# 1. New Users Table
+# 1. Users Table
 users_table = Table(
     'Users', metadata,
     Column('id', Integer, primary_key=True, autoincrement=True),
@@ -25,64 +26,112 @@ users_table = Table(
     Column('password_hash', String, nullable=False)
 )
 
-# 2. Updated Movement Table
-movement_table = Table(
-    'Movement_Table', metadata,
-    Column('id', Integer, primary_key=True, autoincrement=True), # New Primary Key
-    Column('user_id', Integer, ForeignKey('Users.id'), nullable=False), # Links to user
-    Column('Set', Integer), # No longer the PK
-    Column('Reps', Integer),
-    Column('Weight', Integer),
-    Column('Body_Weight', Integer),
-    Column('Date', String),
-    Column('Tonnage', Integer),
-    Column('Relative_Intensity', Integer),
-    Column('Wilks_Tonnage', Integer),
-    Column('Wilks_Relative_Intensity', Integer),
-    Column('One_Rep_Max', Integer),
+# 2. Movement categories registry (per-user)
+movements_table = Table(
+    'Movements', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('user_id', Integer, ForeignKey('Users.id'), nullable=False),
+    Column('name', String, nullable=False),
+    Column('table_name', String, unique=True, nullable=False)
 )
 
-# Create tables if they don't exist
+# Create registry / user tables if they don't exist
 metadata.create_all(engine)
 
-# --- Routes ---
+# Helper: slugify movement name into a safe table name fragment
+def _slugify(name: str) -> str:
+    name = name.lower().strip()
+    name = re.sub(r'[^a-z0-9_]+', '_', name)
+    name = re.sub(r'_+', '_', name).strip('_')
+    if not name:
+        name = 'movement'
+    return name
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        action = request.form.get("action")
-        username = request.form.get("username")
-        password = request.form.get("password")
+# Helper: ensure per-movement table exists; returns a Table object
+def ensure_movement_table(table_name: str):
+    # Use the global metadata so ForeignKey('Users.id') can be resolved
+    t = Table(
+        table_name, metadata,
+        Column('id', Integer, primary_key=True, autoincrement=True),
+        Column('user_id', Integer, ForeignKey('Users.id'), nullable=False),
+        Column('Set', Integer),
+        Column('Reps', Integer),
+        Column('Weight', Integer),
+        Column('Body_Weight', Integer),
+        Column('Date', String),
+        Column('Tonnage', Integer),
+        Column('Relative_Intensity', Integer),
+        Column('Wilks_Tonnage', Integer),
+        Column('Wilks_Relative_Intensity', Integer),
+        Column('One_Rep_Max', Integer),
+    )
+    # create physical table if not exists; using metadata attached to t allows FK resolution
+    t.create(engine, checkfirst=True)
+    return t
 
-        with engine.connect() as conn:
-            if action == "register":
-                # Check if user exists
-                existing = conn.execute(select(users_table).where(users_table.c.username == username)).fetchone()
-                if existing:
-                    flash("Username already exists.", "error")
-                else:
-                    # Create new user
-                    hashed_pw = generate_password_hash(password)
-                    conn.execute(insert(users_table).values(username=username, password_hash=hashed_pw))
-                    conn.commit()
-                    flash("Registration successful! Please log in.", "success")
-            
-            elif action == "login":
-                # Verify user
-                user = conn.execute(select(users_table).where(users_table.c.username == username)).fetchone()
-                if user and check_password_hash(user.password_hash, password):
-                    session["user_id"] = user.id
-                    session["username"] = user.username
-                    return redirect(url_for("index"))
-                else:
-                    flash("Invalid username or password.", "error")
+# Helper: load existing movement table object (autoload)
+def load_movement_table(table_name: str):
+    try:
+        # use the same global metadata for autoload so FK references are known
+        t = Table(table_name, metadata, autoload_with=engine)
+        return t
+    except Exception:
+        # If autoload fails, create it (fallback)
+        return ensure_movement_table(table_name)
 
-    return render_template("login.html")
+@app.route("/create_movement", methods=["POST"])
+def create_movement():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    name = request.form.get("movement_name", "").strip()
+    if not name:
+        flash("Movement name required.", "error")
+        return redirect(url_for("index"))
+    slug = _slugify(name)
+    table_name = f"Movement_{session['user_id']}_{slug}"
+    # ensure unique table_name if duplicate slug exists
+    suffix = 1
+    base_table_name = table_name
+    with engine.begin() as conn:
+        while conn.execute(select(movements_table).where(movements_table.c.table_name == table_name)).fetchone():
+            suffix += 1
+            table_name = f"{base_table_name}_{suffix}"
+        # insert movement record
+        conn.execute(insert(movements_table).values(user_id=session["user_id"], name=name, table_name=table_name))
+    # create movement table
+    ensure_movement_table(table_name)
+    flash("Movement created.", "success")
+    return redirect(url_for("index"))
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
+@app.route("/delete_movement", methods=["POST"])
+def delete_movement():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    movement_id = request.form.get("movement_id")
+    try:
+        movement_id = int(movement_id)
+    except Exception:
+        flash("Invalid movement id.", "error")
+        return redirect(url_for("index"))
+    with engine.begin() as conn:
+        mv = conn.execute(select(movements_table).where(movements_table.c.id == movement_id)).fetchone()
+        if not mv:
+            flash("Movement not found.", "error")
+            return redirect(url_for("index"))
+        if mv.user_id != session["user_id"]:
+            flash("Not authorized.", "error")
+            return redirect(url_for("index"))
+        table_name = mv.table_name
+        # drop physical table if present — use global metadata for autoload so FKs resolve
+        try:
+            t = Table(table_name, metadata, autoload_with=engine)
+            t.drop(engine, checkfirst=True)
+        except Exception:
+            pass
+        # remove movement registry row
+        conn.execute(movements_table.delete().where(movements_table.c.id == movement_id))
+    flash("Movement deleted.", "success")
+    return redirect(url_for("index"))
 
 @app.route("/tonnage_plot")
 def tonnage_plot():
@@ -90,17 +139,23 @@ def tonnage_plot():
     if "user_id" not in session:
         return Response("Unauthorized", status=401)
 
+    movement_id = request.args.get("m", type=int)
+    if not movement_id:
+        return Response("No movement selected", status=400)
+
     with engine.connect() as conn:
-        stmt = select(
-            movement_table.c.id,
-            movement_table.c.Date,
-            movement_table.c.Tonnage,
-            movement_table.c.Relative_Intensity,
-            movement_table.c.One_Rep_Max
-        ).where(
-            movement_table.c.user_id == session["user_id"]
-        ).order_by(movement_table.c.Date.asc())
-        rows = conn.execute(stmt).fetchall()
+        mv = conn.execute(select(movements_table).where(movements_table.c.id == movement_id, movements_table.c.user_id == session["user_id"])).fetchone()
+        if not mv:
+            return Response("Movement not found", status=404)
+        table_name = mv.table_name
+
+        # load rows from that movement table
+        try:
+            t = load_movement_table(table_name)
+            stmt = select(t.c.id, t.c.Date, t.c.Tonnage, t.c.Relative_Intensity, t.c.One_Rep_Max).where(t.c.user_id == session["user_id"]).order_by(t.c.Date.asc())
+            rows = conn.execute(stmt).fetchall()
+        except Exception:
+            rows = []
 
     # Build structured list with parsed dates so we can find the PB set's date easily
     entries = []
@@ -136,7 +191,6 @@ def tonnage_plot():
     one_rms = [e["one_rm"] for e in entries if e["one_rm"] is not None]
     if one_rms:
         pb_one_rm = max(one_rms)
-        # find entries with that one_rm and pick the latest date
         pb_entries = [e for e in entries if e["one_rm"] == pb_one_rm]
         if pb_entries:
             pb_date = max(e["dt"] for e in pb_entries)
@@ -158,13 +212,11 @@ def tonnage_plot():
         plt.xticks(rotation=45, ha='right')
         plt.grid(alpha=0.25)
 
-        # Plot relative intensity on secondary axis if present
         ax2 = None
         if dates_r:
             ax2 = ax.twinx()
             ax2.plot(dates_r, rel_intensities, marker='s', linestyle='--', color='#f45b69', label='Relative Intensity')
             ax2.set_ylabel("Relative Intensity (ratio)")
-            # Optionally tighten y-limits for readability
             try:
                 ymin, ymax = min(rel_intensities), max(rel_intensities)
                 pad = max(1, int((ymax - ymin) * 0.1)) if ymax != ymin else 1
@@ -172,18 +224,13 @@ def tonnage_plot():
             except Exception:
                 pass
 
-        # Draw PB indicator if we found a pb_date
         if pb_date is not None:
-            # vertical dashed line
             ax.axvline(pb_date, color='orange', linestyle=':', linewidth=1.5, alpha=0.9)
-            # place label near top of plotting area (use ax coordinates to avoid scale issues)
             ylim = ax.get_ylim()
-            # text slightly above top of plot area using transform
             ax.text(pb_date, ylim[1], "PB One Rep Max", color='orange', fontsize=9, ha='center', va='bottom',
                     backgroundcolor='white', bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='none', alpha=0.8))
 
         plt.tight_layout()
-        # optional legend combining both axes
         try:
             lines, labels = ax.get_legend_handles_labels()
             if ax2 is not None:
@@ -206,58 +253,109 @@ def index():
     if "user_id" not in session:
         return redirect(url_for("login"))
 
+    # load user's movements
+    with engine.connect() as conn:
+        movements = conn.execute(select(movements_table).where(movements_table.c.user_id == session["user_id"])).fetchall()
+
+    # find selected movement id from query param or default to first movement
+    selected_movement_id = request.args.get("m", type=int)
+    if not selected_movement_id and movements:
+        selected_movement_id = movements[0].id
+
+    selected_movement = None
+    workouts = []
+    if selected_movement_id:
+        with engine.connect() as conn:
+            selected_movement = conn.execute(select(movements_table).where(movements_table.c.id == selected_movement_id, movements_table.c.user_id == session["user_id"])).fetchone()
+            if selected_movement:
+                # load movement-specific table and fetch workouts
+                t = load_movement_table(selected_movement.table_name)
+                stmt = select(t).where(t.c.user_id == session["user_id"]).order_by(t.c.Date.desc(), t.c.Set.asc())
+                try:
+                    workouts = conn.execute(stmt).fetchall()
+                except Exception:
+                    workouts = []
+
     if request.method == "POST":
+        # logging a set — requires movement_id in form
+        movement_id = request.form.get("movement_id", type=int)
+        if not movement_id:
+            flash("Select a movement first.", "error")
+            return redirect(url_for("index"))
+        # ensure movement belongs to user
+        with engine.connect() as conn:
+            mv = conn.execute(select(movements_table).where(movements_table.c.id == movement_id, movements_table.c.user_id == session["user_id"])).fetchone()
+            if not mv:
+                flash("Movement not found.", "error")
+                return redirect(url_for("index"))
+            table_name = mv.table_name
+
         try:
-            # Parse basic form values
-            set_val = int(request.form.get("Set"))
             reps = int(request.form.get("Reps"))
             weight = int(request.form.get("Weight"))
             body_weight = int(request.form.get("Body_Weight"))
             date_str = request.form.get("Date")
 
-            # Calculate tonnage (Reps * Weight)
-            tonnage = reps * weight
-
-            # Calculate One Rep Max using common formula: Weight * (1 + Reps/30)
+            per_set_tonnage = reps * weight
             one_rm = int(round(weight * (1 + (reps / 30.0))))
 
-            # Determine user's current PB (max One_Rep_Max) to compute relative intensity
-            with engine.connect() as conn:
-                pb_stmt = select(func.max(movement_table.c.One_Rep_Max)).where(movement_table.c.user_id == session["user_id"])
+            # Determine user's current PB in this movement
+            # Use a transaction so insert + update are committed
+            with engine.begin() as conn:
+                t = load_movement_table(table_name)
+                pb_stmt = select(func.max(t.c.One_Rep_Max)).where(t.c.user_id == session["user_id"])
                 pb_result = conn.execute(pb_stmt).scalar()
                 PB_1rm = None if pb_result is None else pb_result
 
-            # Compute relative intensity as integer ratio (fallback to 1 if no PB)
-            if PB_1rm and PB_1rm != 0:
-                relative_intensity = int(round(float(one_rm) / float(PB_1rm)))
-            else:
-                # No PB yet: treat this set as baseline (relative intensity = 1)
-                relative_intensity = 1
+                # compute next set number for this user/date in this movement
+                max_set_stmt = select(func.max(t.c.Set)).where(t.c.user_id == session["user_id"], t.c.Date == date_str)
+                max_set = conn.execute(max_set_stmt).scalar()
+                set_val = 1 if max_set is None else int(max_set) + 1
 
-            form_data = {
-                "user_id": session["user_id"], # Attach data to logged-in user
-                "Set": set_val,
-                "Reps": reps,
-                "Weight": weight,
-                "Body_Weight": body_weight,
-                "Date": date_str,
-                "Tonnage": tonnage,
-                "One_Rep_Max": one_rm,
-                "Relative_Intensity": relative_intensity
-            }
+                if PB_1rm and PB_1rm != 0:
+                    relative_intensity = int(round(float(one_rm) / float(PB_1rm)))
+                else:
+                    relative_intensity = 1
 
-            with engine.begin() as conn:
-                conn.execute(insert(movement_table).values(**form_data))
+                form_data = {
+                    "user_id": session["user_id"],
+                    "Set": set_val,
+                    "Reps": reps,
+                    "Weight": weight,
+                    "Body_Weight": body_weight,
+                    "Date": date_str,
+                    "Tonnage": per_set_tonnage,
+                    "One_Rep_Max": one_rm,
+                    "Relative_Intensity": relative_intensity
+                }
+
+                # insert into movement-specific table and recompute daily total for that movement/date
+                conn.execute(insert(t).values(**form_data))
+
+                daily_total_stmt = select(func.sum(t.c.Reps * t.c.Weight)).where(t.c.user_id == session["user_id"], t.c.Date == date_str)
+                daily_total = conn.execute(daily_total_stmt).scalar()
+                if daily_total is None:
+                    daily_total = 0
+                try:
+                    daily_total = int(daily_total)
+                except Exception:
+                    daily_total = int(round(float(daily_total)))
+
+                conn.execute(
+                    t.update()
+                    .where(t.c.user_id == session["user_id"])
+                    .where(t.c.Date == date_str)
+                    .values(Tonnage=daily_total)
+                )
+
             flash("Workout data logged successfully!", "success")
+            return redirect(url_for("index", m=movement_id))
         except Exception as e:
             flash(f"An error occurred: {str(e)}", "error")
+            return redirect(url_for("index", m=movement_id))
 
-    # Fetch this specific user's past data to display
-    with engine.connect() as conn:
-        stmt = select(movement_table).where(movement_table.c.user_id == session["user_id"]).order_by(movement_table.c.Date.desc())
-        user_workouts = conn.execute(stmt).fetchall()
-
-    return render_template("index.html", workouts=user_workouts, username=session["username"])
+    # GET: render page (workouts loaded above)
+    return render_template("index.html", workouts=workouts, username=session["username"], movements=movements, selected_movement=selected_movement)
 
 @app.route("/delete_set", methods=["POST"])
 def delete_set():
@@ -266,30 +364,88 @@ def delete_set():
         return redirect(url_for("login"))
 
     entry_id = request.form.get("entry_id")
+    movement_id = request.form.get("movement_id", type=int)
     try:
         entry_id = int(entry_id)
     except Exception:
         flash("Invalid entry id.", "error")
         return redirect(url_for("index"))
 
-    with engine.begin() as conn:
-        # Verify entry exists and belongs to current user
-        stmt = select(movement_table.c.user_id).where(movement_table.c.id == entry_id)
-        row = conn.execute(stmt).fetchone()
-        if not row:
-            flash("Entry not found.", "error")
-            return redirect(url_for("index"))
+    if not movement_id:
+        flash("Missing movement id.", "error")
+        return redirect(url_for("index"))
 
-        owner_id = row[0]
-        if owner_id != session["user_id"]:
+    with engine.begin() as conn:
+        mv = conn.execute(select(movements_table).where(movements_table.c.id == movement_id)).fetchone()
+        if not mv:
+            flash("Movement not found.", "error")
+            return redirect(url_for("index"))
+        if mv.user_id != session["user_id"]:
             flash("Not authorized to delete this entry.", "error")
             return redirect(url_for("index"))
 
-        # Delete the entry
-        conn.execute(movement_table.delete().where(movement_table.c.id == entry_id))
+        t = load_movement_table(mv.table_name)
+        # Verify entry exists and belongs to current user
+        row = conn.execute(select(t.c.user_id, t.c.Date).where(t.c.id == entry_id)).fetchone()
+        if not row:
+            flash("Entry not found.", "error")
+            return redirect(url_for("index", m=movement_id))
+
+        owner_id, entry_date = row[0], row[1]
+        if owner_id != session["user_id"]:
+            flash("Not authorized to delete this entry.", "error")
+            return redirect(url_for("index", m=movement_id))
+
+        # Delete the entry from the movement-specific table
+        conn.execute(t.delete().where(t.c.id == entry_id))
+
+        # Recompute daily total for that date and update remaining rows for that date (use t)
+        daily_total_stmt = select(func.sum(t.c.Reps * t.c.Weight)).where(
+            t.c.user_id == session["user_id"],
+            t.c.Date == entry_date
+        )
+        daily_total = conn.execute(daily_total_stmt).scalar()
+        if daily_total is None:
+            daily_total = 0
+        try:
+            daily_total = int(daily_total)
+        except Exception:
+            daily_total = int(round(float(daily_total)))
+
+        conn.execute(
+            t.update()
+            .where(t.c.user_id == session["user_id"])
+            .where(t.c.Date == entry_date)
+            .values(Tonnage=daily_total)
+        )
+
         flash("Entry deleted.", "success")
 
-    return redirect(url_for("index"))
+    return redirect(url_for("index", m=movement_id))
+
+@app.route("/progress")
+def progress():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    with engine.connect() as conn:
+        movements = conn.execute(select(movements_table).where(movements_table.c.user_id == session["user_id"])).fetchall()
+    return render_template("progress.html", username=session["username"], movements=movements, selected_tab='progress', selected_movement=None)
+
+@app.route("/science")
+def science():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    with engine.connect() as conn:
+        movements = conn.execute(select(movements_table).where(movements_table.c.user_id == session["user_id"])).fetchall()
+    return render_template("science.html", username=session["username"], movements=movements, selected_tab='science', selected_movement=None)
+
+@app.route("/profile")
+def profile():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    with engine.connect() as conn:
+        movements = conn.execute(select(movements_table).where(movements_table.c.user_id == session["user_id"])).fetchall()
+    return render_template("profile.html", username=session["username"], movements=movements, selected_tab='profile', selected_movement=None)
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

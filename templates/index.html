@@ -10,12 +10,39 @@
         }
 
         .container {
-            max-width: 600px;
+            max-width: 700px;
             margin: auto;
             background: white;
             padding: 20px;
             border-radius: 8px;
         }
+
+        .title {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .top-nav {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .nav-btn {
+            background: #e9ecef;
+            color: #333;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+            .nav-btn.active {
+                background: #007bff;
+                color: white;
+            }
 
         .header {
             display: flex;
@@ -32,6 +59,40 @@
 
         button {
             background: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        /* Movement buttons row */
+        .movement-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 12px 0;
+        }
+
+        .movement-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+            .movement-btn.active {
+                background: #0056b3;
+            }
+
+        .btn-delete {
+            background: #dc3545;
+            width: auto;
+            margin-bottom: 0;
+            padding: 5px 10px;
+            border-radius: 4px;
             color: white;
             border: none;
             cursor: pointer;
@@ -65,11 +126,41 @@
                 border: 1px solid #ddd;
                 border-radius: 8px;
             }
+
+        .inline-form {
+            margin: 0;
+            display: inline;
+        }
+
+        .movement-name {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .small-delete {
+            background: transparent;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            padding: 0 6px;
+        }
     </style>
 </head>
 <body>
 
     <div class="container">
+        <div class="title">
+            <h1>Ryan's workout tracker</h1>
+        </div>
+
+        <div class="top-nav" role="navigation" aria-label="top-navigation">
+            <a class="nav-btn {% if selected_tab == 'progress' %}active{% endif %}" href="{{ url_for('progress') }}">Progress</a>
+            <a class="nav-btn {% if selected_tab == 'log' %}active{% endif %}" href="{{ url_for('index') }}{% if selected_movement %}?m={{ selected_movement.id }}{% endif %}">Log workouts</a>
+            <a class="nav-btn {% if selected_tab == 'science' %}active{% endif %}" href="{{ url_for('science') }}">Science</a>
+            <a class="nav-btn {% if selected_tab == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">Profile</a>
+        </div>
+
         <div class="header">
             <h2>{{ username }}'s Workouts</h2>
             <a href="/logout">Logout</a>
@@ -79,41 +170,81 @@
         {% if messages %} <p style="color: green;">{{ messages[0] }}</p> {% endif %}
         {% endwith %}
 
-                          <form method="POST">
-                              <label>Date</label> <input type="date" name="Date" required>
-                              <label>Set</label> <input type="number" name="Set" required>
-                              <label>Reps</label> <input type="number" name="Reps" required>
-                              <label>Weight</label> <input type="number" name="Weight" required>
-                              <label>Body Weight</label> <input type="number" name="Body_Weight" required>
+        <!-- Movement creation -->
+        <form method="POST" action="{{ url_for('create_movement') }}">
+            <label>Movement</label>
+            <input type="text" name="movement_name" placeholder="e.g. Back Squat" required>
+            <button type="submit">Add Movement</button>
+        </form>
 
+        <!-- Movement buttons row -->
+        <div class="movement-row" aria-label="movement-buttons">
+            {% for mv in movements %}
+            <div class="movement-name">
+                <a href="{{ url_for('index') }}?m={{ mv.id }}">
+                    <button class="movement-btn {% if selected_movement and selected_movement.id == mv.id %}active{% endif %}" type="button">{{ mv.name }}</button>
+                </a>
 
-                              <button type="submit">Log Workout</button>
-                          </form>
-
-        <!-- ADDED: This section calls the /tonnage_plot route to display the graph -->
-        <div class="graph-container">
-            <h3>Tonnage Over Time</h3>
-            <img src="/tonnage_plot" alt="Tonnage Graph">
+                <!-- small delete form for movement -->
+                <form class="inline-form" method="POST" action="{{ url_for('delete_movement') }}" onsubmit="return confirm('Delete movement and all its sets?');">
+                    <input type="hidden" name="movement_id" value="{{ mv.id }}">
+                    <button class="small-delete" title="Delete movement">🗑️</button>
+                </form>
+            </div>
+            {% else %}
+            <p>No movements yet — create one above.</p>
+            {% endfor %}
         </div>
 
-        <h3>Your Past Logs</h3>
+        <!-- Log form: requires a selected movement -->
+        {% if not selected_movement %}
+        <p style="color: #666;">Select a movement to log sets into it.</p>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('index') }}">
+            <input type="hidden" name="movement_id" id="movement_id" value="{{ selected_movement.id if selected_movement else '' }}">
+            <label>Date</label> <input type="date" name="Date" required {{ 'disabled' if not selected_movement }}>
+            <label>Reps</label> <input type="number" name="Reps" required {{ 'disabled' if not selected_movement }}>
+            <label>Weight</label> <input type="number" name="Weight" required {{ 'disabled' if not selected_movement }}>
+            <label>Body Weight</label> <input type="number" name="Body_Weight" required {{ 'disabled' if not selected_movement }}>
+            <button type="submit" {{ 'disabled' if not selected_movement }}>Log Workout</button>
+        </form>
+
+        <div class="graph-container">
+            <h3>Tonnage Over Time — {{ selected_movement.name if selected_movement else '' }}</h3>
+            <img src="{{ url_for('tonnage_plot') }}?m={{ selected_movement.id if selected_movement else '' }}" alt="Tonnage Graph">
+        </div>
+
+        <h3>Your Past Logs — {{ selected_movement.name if selected_movement else '' }}</h3>
         <table>
             <tr>
                 <th>Date</th>
                 <th>Set</th>
                 <th>Reps</th>
                 <th>Weight</th>
+                <th>Action</th>
             </tr>
+            {% if selected_movement %}
             {% for w in workouts %}
             <tr>
                 <td>{{ w.Date }}</td>
                 <td>{{ w.Set }}</td>
                 <td>{{ w.Reps }}</td>
                 <td>{{ w.Weight }}</td>
+                <td>
+                    <form action="{{ url_for('delete_set') }}" method="POST" class="inline-form" onsubmit="return confirm('Delete this entry?');">
+                        <input type="hidden" name="entry_id" value="{{ w.id }}">
+                        <input type="hidden" name="movement_id" value="{{ selected_movement.id }}">
+                        <button type="submit" class="btn-delete">Delete</button>
+                    </form>
+                </td>
             </tr>
             {% else %}
-            <tr><td colspan="4">No workouts logged yet.</td></tr>
+            <tr><td colspan="5">No workouts logged yet for this movement.</td></tr>
             {% endfor %}
+            {% else %}
+            <tr><td colspan="5">No movement selected.</td></tr>
+            {% endif %}
         </table>
     </div>
 
