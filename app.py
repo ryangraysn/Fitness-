@@ -10,6 +10,7 @@ import matplotlib.dates as mdates
 from datetime import datetime
 import re
 #will was here
+#ry was here
 app = Flask(__name__)
 app.secret_key = "super_secret_key_change_this_in_production" # Required for sessions
 
@@ -122,7 +123,7 @@ def delete_movement():
             flash("Not authorized.", "error")
             return redirect(url_for("index"))
         table_name = mv.table_name
-        # drop physical table if present — use global metadata for autoload so FKs resolve
+        # drop physical table if present ï¿½ use global metadata for autoload so FKs resolve
         try:
             t = Table(table_name, metadata, autoload_with=engine)
             t.drop(engine, checkfirst=True)
@@ -277,7 +278,7 @@ def index():
                     workouts = []
 
     if request.method == "POST":
-        # logging a set — requires movement_id in form
+        # logging a set ï¿½ requires movement_id in form
         movement_id = request.form.get("movement_id", type=int)
         if not movement_id:
             flash("Select a movement first.", "error")
