@@ -197,13 +197,22 @@
             border-radius: 6px;
             cursor: pointer;
         }
+
+        .one-rep-max-note {
+            margin: 0 0 20px 0;
+            padding: 12px 14px;
+            border: 1px solid #e0e6ef;
+            background: #f8fbff;
+            border-radius: 8px;
+            color: #2b3a4a;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
     <header class="site-title">
         <h1>Ryan's workout tracker</h1>
         <nav class="top-nav" role="navigation" aria-label="top-navigation">
-            <a class="nav-btn {% if selected_tab == 'progress' %}active{% endif %}" href="{{ url_for('progress') }}">Progress</a>
             <a class="nav-btn active" href="{{ url_for('index') }}">Log workouts</a>
             <a class="nav-btn {% if selected_tab == 'science' %}active{% endif %}" href="{{ url_for('science') }}">Science</a>
             <a class="nav-btn {% if selected_tab == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">Profile</a>
@@ -263,8 +272,8 @@
             <input type="hidden" name="movement_id" id="movement_id" value="{{ selected_movement.id if selected_movement else '' }}">
             <label>Date</label> <input type="date" name="Date" required {{ 'disabled' if not selected_movement }}>
             <label>Reps</label> <input type="number" name="Reps" required {{ 'disabled' if not selected_movement }}>
-            <label>Weight</label> <input type="number" name="Weight" required {{ 'disabled' if not selected_movement }}>
-            <label>Body Weight</label> <input type="number" name="Body_Weight" required {{ 'disabled' if not selected_movement }}>
+            <label>Weight ({{ weight_unit }})</label> <input type="number" name="Weight" required {{ 'disabled' if not selected_movement }}>
+            <label>Body Weight ({{ weight_unit }})</label> <input type="number" name="Body_Weight" required {{ 'disabled' if not selected_movement }}>
             <button type="submit" class="log-btn" {{ 'disabled' if not selected_movement }}>Log Workout</button>
         </form>
 
@@ -272,6 +281,13 @@
             <h3>Tonnage Over Time — {{ selected_movement.name if selected_movement else '' }}</h3>
             <img src="{{ url_for('tonnage_plot') }}?m={{ selected_movement.id if selected_movement else '' }}" alt="Tonnage Graph">
         </div>
+
+        {% if selected_movement and one_rep_max_display is not none %}
+        <div class="one-rep-max-note">
+            <strong>Your one rep max for this movement is {{ one_rep_max_display }} {{ weight_unit }}.</strong>
+            If this is a compound movement like a squat or deadlift, see how close to it you can get, safely of course!
+        </div>
+        {% endif %}
 
         <h3>Your Past Logs — {{ selected_movement.name if selected_movement else '' }}</h3>
         <table>
@@ -288,7 +304,7 @@
                 <td>{{ w.Date }}</td>
                 <td>{{ w.Set }}</td>
                 <td>{{ w.Reps }}</td>
-                <td>{{ w.Weight }}</td>
+                <td>{{ w.Weight }} {{ weight_unit }}</td>
                 <td>
                     <form action="{{ url_for('delete_set') }}" method="POST" class="inline-form" onsubmit="return confirm('Delete this entry?');">
                         <input type="hidden" name="entry_id" value="{{ w.id }}">
