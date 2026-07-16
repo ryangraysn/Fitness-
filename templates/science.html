@@ -283,7 +283,6 @@
     <header class="site-title">
         <h1>Ryan's workout tracker</h1>
         <nav class="top-nav" role="navigation" aria-label="top-navigation">
-            <a class="nav-btn {% if selected_tab == 'progress' %}active{% endif %}" href="{{ url_for('progress') }}">Progress</a>
             <a class="nav-btn {% if selected_tab == 'log' %}active{% endif %}" href="{{ url_for('index') }}">Log workouts</a>
             <a class="nav-btn {% if selected_tab == 'science' %}active{% endif %}" href="{{ url_for('science') }}">Science</a>
             <a class="nav-btn {% if selected_tab == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">Profile</a>

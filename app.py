@@ -39,8 +39,8 @@ def convert_weight_to_storage(value, unit):
         return None
     value = float(value)
     if unit == WEIGHT_UNIT_LBS:
-        return round(value / 2.20462, 2)
-    return round(value, 2)
+        return value / 2.20462
+    return value
 
 # --- Database Setup ---
 DB_URL = 'sqlite:///Fitness_Database.db'
@@ -365,6 +365,7 @@ def index():
 
     selected_movement = None
     workouts = []
+    one_rep_max_display = None
     if selected_movement_id:
         with engine.connect() as conn:
             selected_movement = conn.execute(select(movements_table).where(movements_table.c.id == selected_movement_id, movements_table.c.user_id == session["user_id"])).fetchone()
@@ -376,6 +377,11 @@ def index():
                     workouts = conn.execute(stmt).fetchall()
                 except Exception:
                     workouts = []
+
+                pb_stmt = select(func.max(t.c.One_Rep_Max)).where(t.c.user_id == session["user_id"])
+                pb_result = conn.execute(pb_stmt).scalar()
+                if pb_result is not None:
+                    one_rep_max_display = convert_weight_to_display(pb_result, current_unit)
 
     if request.method == "POST":
         # logging a set � requires movement_id in form
@@ -393,14 +399,14 @@ def index():
 
         try:
             reps = int(request.form.get("Reps"))
-            weight = int(request.form.get("Weight"))
-            body_weight = int(request.form.get("Body_Weight"))
+            weight = float(request.form.get("Weight"))
+            body_weight = float(request.form.get("Body_Weight"))
             if current_unit == WEIGHT_UNIT_LBS:
-                weight = int(round(convert_weight_to_storage(weight, current_unit)))
-                body_weight = int(round(convert_weight_to_storage(body_weight, current_unit)))
+                weight = convert_weight_to_storage(weight, current_unit)
+                body_weight = convert_weight_to_storage(body_weight, current_unit)
             date_str = request.form.get("Date")
 
-            per_set_tonnage = reps * weight
+            per_set_tonnage = int(round(reps * weight))
             one_rm = int(round(weight * (1 + (reps / 30.0))))
 
             # Determine user's current PB in this movement
@@ -459,7 +465,24 @@ def index():
             return redirect(url_for("index", m=movement_id))
 
     # GET: render page (workouts loaded above)
-    return render_template("index.html", workouts=workouts, username=session["username"], movements=movements, selected_movement=selected_movement, weight_unit=current_unit)
+    display_workouts = []
+    for workout in workouts:
+        display_workout = dict(workout._mapping)
+        if display_workout.get("Weight") is not None:
+            display_workout["Weight"] = convert_weight_to_display(display_workout["Weight"], current_unit)
+        if display_workout.get("Body_Weight") is not None:
+            display_workout["Body_Weight"] = convert_weight_to_display(display_workout["Body_Weight"], current_unit)
+        display_workouts.append(display_workout)
+
+    return render_template(
+        "index.html",
+        workouts=display_workouts,
+        username=session["username"],
+        movements=movements,
+        selected_movement=selected_movement,
+        weight_unit=current_unit,
+        one_rep_max_display=one_rep_max_display,
+    )
 
 @app.route("/delete_set", methods=["POST"])
 def delete_set():
