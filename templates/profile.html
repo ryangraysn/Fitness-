@@ -8,6 +8,14 @@
         .top-nav{ display:flex; gap:8px; justify-content:center; margin-bottom:16px; }
         .nav-btn{ background:#e9ecef; color:#333; padding:8px 12px; border-radius:6px; text-decoration:none; }
         .nav-btn.active{ background:#007bff;color:white; }
+        .profile-card{ border:1px solid #e0e0e0; border-radius:8px; padding:16px; margin-top:16px; }
+        .profile-row{ margin-bottom:12px; }
+        .gender-options{ display:flex; gap:12px; margin-top:6px; }
+        .gender-options label{ display:flex; align-items:center; gap:6px; }
+        button{ background:#007bff; color:white; border:none; padding:10px 14px; border-radius:6px; cursor:pointer; }
+        .flash{ padding:10px; border-radius:6px; margin-bottom:12px; }
+        .flash.success{ background:#eaf7ea; color:#256029; }
+        .flash.error{ background:#fdecea; color:#a61b1b; }
     </style>
 </head>
 <body>
@@ -20,8 +28,30 @@
             <a class="nav-btn {% if selected_tab == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">Profile</a>
         </div>
 
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+
         <h2>Profile</h2>
-        <p>Placeholder for user profile settings, bodyweight, gender and other preferences.</p>
+        <div class="profile-card">
+            <div class="profile-row"><strong>Name:</strong> {{ username }}</div>
+            <form method="post">
+                <div class="profile-row">
+                    <label>Gender</label>
+                    <div class="gender-options">
+                        <label><input type="radio" name="gender" value="male" {% if gender == 'male' %}checked{% endif %}> Male</label>
+                        <label><input type="radio" name="gender" value="female" {% if gender == 'female' %}checked{% endif %}> Female</label>
+                    </div>
+                </div>
+                <div class="profile-row">
+                    <label for="body_weight">Body weight (kg)</label><br>
+                    <input id="body_weight" name="body_weight" type="number" step="0.1" min="0" value="{{ body_weight }}">
+                </div>
+                <button type="submit">Save profile</button>
+            </form>
+        </div>
     </div>
 </body>
 </html>
