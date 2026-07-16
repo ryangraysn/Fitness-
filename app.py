@@ -216,7 +216,8 @@ def tonnage_plot():
     plt.figure(figsize=(8, 3.5))
     if not dates_t and not dates_r:
         plt.text(0.5, 0.5, "No tonnage or relative intensity data", horizontalalignment='center', verticalalignment='center', fontsize=14)
-        plt.axis('off')
+        plt.axis('off'
+                  '')
     else:
         ax = plt.gca()
         if dates_t:
@@ -269,9 +270,12 @@ def index():
     if "user_id" not in session:
         return redirect(url_for("login"))
 
-    # load user's movements
+    # load user's movements and profile body weight
     with engine.connect() as conn:
         movements = conn.execute(select(movements_table).where(movements_table.c.user_id == session["user_id"])).fetchall()
+        user_row = conn.execute(select(users_table.c.body_weight).where(users_table.c.id == session["user_id"])).fetchone()
+
+    body_weight = user_row.body_weight if user_row and user_row.body_weight is not None else ""
 
     # find selected movement id from query param or default to first movement
     selected_movement_id = request.args.get("m", type=int)
@@ -309,8 +313,16 @@ def index():
         try:
             reps = int(request.form.get("Reps"))
             weight = int(request.form.get("Weight"))
-            body_weight = int(request.form.get("Body_Weight"))
             date_str = request.form.get("Date")
+
+            # Attempt to parse body weight from form; if not present or invalid, fallback to user's profile value
+            raw_body_weight = request.form.get("Body_Weight", "")
+            body_weight_val = None
+            if raw_body_weight is not None and str(raw_body_weight).strip() != "":
+                try:
+                    body_weight_val = int(float(raw_body_weight))
+                except Exception:
+                    body_weight_val = None
 
             per_set_tonnage = reps * weight
             one_rm = int(round(weight * (1 + (reps / 30.0))))
@@ -319,6 +331,16 @@ def index():
             # Use a transaction so insert + update are committed
             with engine.begin() as conn:
                 t = load_movement_table(table_name)
+
+                # If form did not provide body weight, fetch from user's profile
+                if body_weight_val is None:
+                    user_row = conn.execute(select(users_table.c.body_weight).where(users_table.c.id == session["user_id"])).fetchone()
+                    if user_row and user_row.body_weight is not None:
+                        try:
+                            body_weight_val = int(user_row.body_weight)
+                        except Exception:
+                            body_weight_val = None
+
                 pb_stmt = select(func.max(t.c.One_Rep_Max)).where(t.c.user_id == session["user_id"])
                 pb_result = conn.execute(pb_stmt).scalar()
                 PB_1rm = None if pb_result is None else pb_result
@@ -338,7 +360,7 @@ def index():
                     "Set": set_val,
                     "Reps": reps,
                     "Weight": weight,
-                    "Body_Weight": body_weight,
+                    "Body_Weight": body_weight_val,
                     "Date": date_str,
                     "Tonnage": per_set_tonnage,
                     "One_Rep_Max": one_rm,
@@ -371,7 +393,7 @@ def index():
             return redirect(url_for("index", m=movement_id))
 
     # GET: render page (workouts loaded above)
-    return render_template("index.html", workouts=workouts, username=session["username"], movements=movements, selected_movement=selected_movement)
+    return render_template("index.html", workouts=workouts, username=session["username"], movements=movements, selected_movement=selected_movement, selected_tab='log', body_weight=body_weight)
 
 @app.route("/delete_set", methods=["POST"])
 def delete_set():

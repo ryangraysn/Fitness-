@@ -269,7 +269,7 @@
     </header>
 
     <div class="container">
-        
+
 
         <div class="one-rm-section" aria-labelledby="one-rm-heading">
             <h3 id="one-rm-heading">Estimated One-Rep Max Table</h3>
@@ -438,8 +438,10 @@
             </table>
 
             <div class="wilks-row" role="region" aria-label="Wilks score tables">
+                {% set fixed_weight = fixed_weight if fixed_weight is defined else 300 %}
                 <div>
-                    <div class="wilks-caption">Wilks score — Males (fixed lift: {{ fixed_weight if fixed_weight is defined else 300 }} lb, 1 rep)</div>
+
+                    <div class="wilks-caption">Wilks score — Males (fixed lift: {{ fixed_weight }} lb, 1 rep)</div>
                     <table class="wilks-table" role="grid" aria-label="Wilks male table">
                         <thead>
                             <tr><th>Bodyweight (lb)</th><th>Wilks score</th></tr>
@@ -454,7 +456,6 @@
                             {% set f = -0.0000000120804336482315 %}
 
                             {# Convert the lifted weight from lbs to kg #}
-                            {% set fixed_weight = fixed_weight if fixed_weight is defined else 300 %}
                             {% set fixed_weight_kg = fixed_weight / 2.20462262 %}
 
                             {% for bw in range(100, 301, 10) %}
@@ -476,26 +477,63 @@
                 </div>
 
                 <div>
+                    <div class="wilks-caption">Wilks score — Females (fixed lift: {{ fixed_weight }} lb, 1 rep)</div>
+                    <table class="wilks-table" role="grid" aria-label="Wilks female table">
+                        <thead>
+                            <tr><th>Bodyweight (lb)</th><th>Wilks score</th></tr>
+                        </thead>
+                        <tbody>
+                            {# Female Wilks coefficients from existing code #}
+                            {% set a_f = -125.4255398 %}
+                            {% set b_f = 13.71219419 %}
+                            {% set c_f = -0.03307250631 %}
+                            {% set d_f = -0.001050400051 %}
+                            {% set e_f = 0.00000938773881462799 %}
+                            {% set f_f = -0.000000023334613884954 %}
+
+                            {# Convert the lifted weight from lbs to kg #}
+                            {% set fixed_weight_kg = fixed_weight / 2.20462262 %}
+
+                            {% for bw in range(100, 301, 10) %}
+                            {# Convert the lifter's bodyweight from lbs to kg #}
+                            {% set bw_kg = bw / 2.20462262 %}
+
+                            {# Use the kg variables to calculate the denominator #}
+                            {% set denom = a_f + b_f*bw_kg + c_f*(bw_kg**2) + d_f*(bw_kg**3) + e_f*(bw_kg**4) + f_f*(bw_kg**5) %}
+
+                            {% if denom != 0 %}
+                            {% set score = (fixed_weight_kg * 600.0) / denom %}
+                            {% else %}
+                            {% set score = 0 %}
+                            {% endif %}
+                            <tr><td>{{ bw }}</td><td>{{ (score | round(1, 'common')) }}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-
             </div>
 
-            <div class="wilks-explain" role="region" aria-label="Wilks explanation">
-                <h4>Wilks Score — formula & utility</h4>
-                <p>
-                    The Wilks score is a way to compare strength (total weight lifted) across lifters of different bodyweights by applying a coefficient calculated from the lifter's bodyweight.
-                    Each sex uses a set of coefficients in the polynomial denominator; the score is typically computed as:
-                </p>
-                <p><code>Wilks score = (weight_lifted) × (constant / polynomial(bodyweight))</code></p>
-                <p>
-                    In the table above we use a constant of 600 and the sex-specific polynomial coefficients embedded in the app (the same coefficients used elsewhere in this codebase).
-                    Higher Wilks scores indicate more strength relative to bodyweight.
-                </p>
-                <p class="note">
-                    Utility: use Wilks to compare performances between lifters of different sizes, to track relative strength improvements, or to normalise progress when bodyweight changes.
-                    Remember Wilks is an estimate — competition federations may use updated scoring formulas (e.g., IPF points). Treat Wilks as a comparison tool, not an absolute measure of ability.
-                </p>
+            <div>
             </div>
+
         </div>
+
+        <div class="wilks-explain" role="region" aria-label="Wilks explanation">
+            <h4>Wilks Score — formula & utility</h4>
+            <p>
+                The Wilks score is a way to compare strength (total weight lifted) across lifters of different bodyweights by applying a coefficient calculated from the lifter's bodyweight.
+                Each sex uses a set of coefficients in the polynomial denominator; the score is typically computed as:
+            </p>
+            <p><code>Wilks score = (weight_lifted) × (constant / polynomial(bodyweight))</code></p>
+            <p>
+                In the table above we use a constant of 600 and the sex-specific polynomial coefficients embedded in the app (the same coefficients used elsewhere in this codebase).
+                Higher Wilks scores indicate more strength relative to bodyweight.
+            </p>
+            <p class="note">
+                Utility: use Wilks to compare performances between lifters of different sizes, to track relative strength improvements, or to normalise progress when bodyweight changes.
+                Remember Wilks is an estimate — competition federations may use updated scoring formulas (e.g., IPF points). Treat Wilks as a comparison tool, not an absolute measure of ability.
+            </p>
+        </div>
+    </div>
 </body>
 </html>

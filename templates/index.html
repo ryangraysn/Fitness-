@@ -183,7 +183,7 @@
         <h1>Ryan's workout tracker</h1>
         <nav class="top-nav" role="navigation" aria-label="top-navigation">
             <a class="nav-btn {% if selected_tab == 'progress' %}active{% endif %}" href="{{ url_for('progress') }}">Progress</a>
-            <a class="nav-btn active" href="{{ url_for('index') }}">Log workouts</a>
+            <a class="nav-btn {% if selected_tab == 'log' or selected_tab == 'index' %}active{% endif %}" href="{{ url_for('index') }}">Log workouts</a>
             <a class="nav-btn {% if selected_tab == 'science' %}active{% endif %}" href="{{ url_for('science') }}">Science</a>
             <a class="nav-btn {% if selected_tab == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">Profile</a>
         </nav>
@@ -236,7 +236,9 @@
             <label>Date</label> <input type="date" name="Date" required {{ 'disabled' if not selected_movement }}>
             <label>Reps</label> <input type="number" name="Reps" required {{ 'disabled' if not selected_movement }}>
             <label>Weight</label> <input type="number" name="Weight" required {{ 'disabled' if not selected_movement }}>
-            <label>Body Weight</label> <input type="number" name="Body_Weight" required {{ 'disabled' if not selected_movement }}>
+            <label>Body Weight</label>
+            <input type="number" name="Body_Weight" value="{{ body_weight }}" {{ 'disabled' if not selected_movement }}>
+            <small style="color:#666;display:block;margin-top:-8px;margin-bottom:8px;font-size:13px;">Leave blank to use your profile body weight.</small>
             <button type="submit" class="log-btn" {{ 'disabled' if not selected_movement }}>Log Workout</button>
         </form>
 
@@ -252,6 +254,7 @@
                 <th>Set</th>
                 <th>Reps</th>
                 <th>Weight</th>
+                <th>Body Weight</th>
                 <th>Action</th>
             </tr>
             {% if selected_movement %}
@@ -261,6 +264,7 @@
                 <td>{{ w.Set }}</td>
                 <td>{{ w.Reps }}</td>
                 <td>{{ w.Weight }}</td>
+                <td>{{ (w.Body_Weight if w.Body_Weight is not none else body_weight) or '—' }}</td>
                 <td>
                     <form action="{{ url_for('delete_set') }}" method="POST" class="inline-form" onsubmit="return confirm('Delete this entry?');">
                         <input type="hidden" name="entry_id" value="{{ w.id }}">
@@ -270,10 +274,10 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="5">No workouts logged yet for this movement.</td></tr>
+            <tr><td colspan="6">No workouts logged yet for this movement.</td></tr>
             {% endfor %}
             {% else %}
-            <tr><td colspan="5">No movement selected.</td></tr>
+            <tr><td colspan="6">No movement selected.</td></tr>
             {% endif %}
         </table>
     </div>
