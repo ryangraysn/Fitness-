@@ -354,9 +354,11 @@ def index():
 
     current_unit = get_weight_unit()
 
-    # load user's movements
+    # load user's movements and profile body weight for template
     with engine.connect() as conn:
         movements = conn.execute(select(movements_table).where(movements_table.c.user_id == session["user_id"])).fetchall()
+        user_row = conn.execute(select(users_table.c.body_weight).where(users_table.c.id == session["user_id"])).fetchone()
+    profile_body_weight_display = convert_weight_to_display(user_row.body_weight, current_unit) if user_row and user_row.body_weight is not None else ""
 
     # find selected movement id from query param or default to first movement
     selected_movement_id = request.args.get("m", type=int)
@@ -384,7 +386,7 @@ def index():
                     one_rep_max_display = convert_weight_to_display(pb_result, current_unit)
 
     if request.method == "POST":
-        # logging a set � requires movement_id in form
+        # logging a set — requires movement_id in form
         movement_id = request.form.get("movement_id", type=int)
         if not movement_id:
             flash("Select a movement first.", "error")
@@ -398,13 +400,32 @@ def index():
             table_name = mv.table_name
 
         try:
+            # required values
             reps = int(request.form.get("Reps"))
-            weight = float(request.form.get("Weight"))
-            body_weight = float(request.form.get("Body_Weight"))
+            weight_raw = (request.form.get("Weight") or "").strip()
+            if weight_raw == "":
+                raise ValueError("Weight is required.")
+            weight = float(weight_raw)
+
+            # optional body weight: parse safely and fallback to profile value if blank
+            body_weight_raw = request.form.get("Body_Weight")
+            body_weight_storage = None
+            if body_weight_raw is not None and str(body_weight_raw).strip() != "":
+                try:
+                    bw_val = float(str(body_weight_raw).strip())
+                    # convert to storage units if user entered in lbs
+                    if current_unit == WEIGHT_UNIT_LBS:
+                        bw_val = convert_weight_to_storage(bw_val, current_unit)
+                    body_weight_storage = bw_val
+                except Exception:
+                    # invalid number — treat as no value provided so fallback to profile
+                    body_weight_storage = None
+
+            date_str = request.form.get("Date")
+
+            # convert submitted weight to storage units if necessary
             if current_unit == WEIGHT_UNIT_LBS:
                 weight = convert_weight_to_storage(weight, current_unit)
-                body_weight = convert_weight_to_storage(body_weight, current_unit)
-            date_str = request.form.get("Date")
 
             per_set_tonnage = int(round(reps * weight))
             one_rm = int(round(weight * (1 + (reps / 30.0))))
@@ -413,6 +434,15 @@ def index():
             # Use a transaction so insert + update are committed
             with engine.begin() as conn:
                 t = load_movement_table(table_name)
+
+                # If form did not provide body weight, fetch from user's profile (stored value is in storage units)
+                if body_weight_storage is None:
+                    user_row = conn.execute(select(users_table.c.body_weight).where(users_table.c.id == session["user_id"])).fetchone()
+                    if user_row and user_row.body_weight is not None:
+                        body_weight_storage = float(user_row.body_weight)
+                    else:
+                        body_weight_storage = None
+
                 pb_stmt = select(func.max(t.c.One_Rep_Max)).where(t.c.user_id == session["user_id"])
                 pb_result = conn.execute(pb_stmt).scalar()
                 PB_1rm = None if pb_result is None else pb_result
@@ -432,7 +462,7 @@ def index():
                     "Set": set_val,
                     "Reps": reps,
                     "Weight": weight,
-                    "Body_Weight": body_weight,
+                    "Body_Weight": int(round(body_weight_storage)) if body_weight_storage is not None else None,
                     "Date": date_str,
                     "Tonnage": per_set_tonnage,
                     "One_Rep_Max": one_rm,
@@ -482,6 +512,7 @@ def index():
         selected_movement=selected_movement,
         weight_unit=current_unit,
         one_rep_max_display=one_rep_max_display,
+        body_weight=profile_body_weight_display,
     )
 
 @app.route("/delete_set", methods=["POST"])
@@ -552,7 +583,7 @@ def delete_set():
 
 @app.route("/progress")
 def progress():
-    if "user_id" not in session:
+    if "user_id" not in session():
         return redirect(url_for("login"))
     current_unit = get_weight_unit()
     with engine.connect() as conn:
