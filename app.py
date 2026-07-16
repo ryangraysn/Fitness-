@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, Response
-from sqlalchemy import Column, Integer, String, Table, MetaData, create_engine, insert, select, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Table, MetaData, create_engine, insert, select, ForeignKey, func, inspect, text
 from werkzeug.security import generate_password_hash, check_password_hash
 import io
 import matplotlib
@@ -24,7 +24,9 @@ users_table = Table(
     'Users', metadata,
     Column('id', Integer, primary_key=True, autoincrement=True),
     Column('username', String, unique=True, nullable=False),
-    Column('password_hash', String, nullable=False)
+    Column('password_hash', String, nullable=False),
+    Column('gender', String, nullable=True),
+    Column('body_weight', Integer, nullable=True)
 )
 
 # 2. Movement categories registry (per-user)
@@ -38,6 +40,19 @@ movements_table = Table(
 
 # Create registry / user tables if they don't exist
 metadata.create_all(engine)
+
+
+def ensure_user_profile_columns():
+    inspector = inspect(engine)
+    existing_columns = {column["name"] for column in inspector.get_columns("Users")}
+    with engine.begin() as conn:
+        if "gender" not in existing_columns:
+            conn.execute(text('ALTER TABLE "Users" ADD COLUMN "gender" VARCHAR'))
+        if "body_weight" not in existing_columns:
+            conn.execute(text('ALTER TABLE "Users" ADD COLUMN "body_weight" INTEGER'))
+
+
+ensure_user_profile_columns()
 
 # Helper: slugify movement name into a safe table name fragment
 def _slugify(name: str) -> str:
@@ -440,13 +455,52 @@ def science():
         movements = conn.execute(select(movements_table).where(movements_table.c.user_id == session["user_id"])).fetchall()
     return render_template("science.html", username=session["username"], movements=movements, selected_tab='science', selected_movement=None)
 
-@app.route("/profile")
+@app.route("/profile", methods=["GET", "POST"])
 def profile():
     if "user_id" not in session:
         return redirect(url_for("login"))
+
     with engine.connect() as conn:
         movements = conn.execute(select(movements_table).where(movements_table.c.user_id == session["user_id"])).fetchall()
-    return render_template("profile.html", username=session["username"], movements=movements, selected_tab='profile', selected_movement=None)
+        user_row = conn.execute(select(users_table.c.gender, users_table.c.body_weight).where(users_table.c.id == session["user_id"])).fetchone()
+
+    gender = user_row.gender if user_row and user_row.gender else ""
+    body_weight = user_row.body_weight if user_row and user_row.body_weight is not None else ""
+
+    if request.method == "POST":
+        selected_gender = request.form.get("gender", "").strip().lower()
+        if selected_gender not in {"male", "female"}:
+            selected_gender = None
+
+        raw_body_weight = request.form.get("body_weight", "").strip()
+        if raw_body_weight:
+            try:
+                body_weight_value = int(float(raw_body_weight))
+            except ValueError:
+                flash("Body weight must be a number.", "error")
+                body_weight_value = None
+        else:
+            body_weight_value = None
+
+        with engine.begin() as conn:
+            conn.execute(
+                users_table.update()
+                .where(users_table.c.id == session["user_id"])
+                .values(gender=selected_gender, body_weight=body_weight_value)
+            )
+
+        flash("Profile updated.", "success")
+        return redirect(url_for("profile"))
+
+    return render_template(
+        "profile.html",
+        username=session["username"],
+        movements=movements,
+        selected_tab='profile',
+        selected_movement=None,
+        gender=gender,
+        body_weight=body_weight,
+    )
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
