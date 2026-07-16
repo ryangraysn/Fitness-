@@ -176,6 +176,27 @@
             cursor: pointer;
             padding: 0 6px;
         }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .unit-label {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .unit-toggle {
+            border: 1px solid #d0d7de;
+            background: #f6f8fa;
+            color: #24292f;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -193,7 +214,14 @@
 
         <div class="header">
             <h2>{{ username }}'s Workouts</h2>
-            <a href="/logout">Logout</a>
+            <div class="header-actions">
+                <span class="unit-label">Units: {{ weight_unit.upper() }}</span>
+                <form method="post" action="{{ url_for('set_weight_unit') }}" class="inline-form">
+                    <input type="hidden" name="unit" value="{{ 'lbs' if weight_unit == 'kg' else 'kg' }}">
+                    <button class="unit-toggle" type="submit">Switch to {{ 'lbs' if weight_unit == 'kg' else 'kg' }}</button>
+                </form>
+                <a href="/logout">Logout</a>
+            </div>
         </div>
 
         {% with messages = get_flashed_messages() %}

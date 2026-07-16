@@ -57,6 +57,28 @@
                 background: #007bff;
                 color: white;
             }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .unit-label {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .unit-toggle {
+            border: 1px solid #d0d7de;
+            background: #f6f8fa;
+            color: #24292f;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -71,7 +93,13 @@
     </header>
 
     <div class="container">
-
+        <div class="header-actions">
+            <span class="unit-label">Units: {{ weight_unit.upper() }}</span>
+            <form method="post" action="{{ url_for('set_weight_unit') }}" class="inline-form">
+                <input type="hidden" name="unit" value="{{ 'lbs' if weight_unit == 'kg' else 'kg' }}">
+                <button class="unit-toggle" type="submit">Switch to {{ 'lbs' if weight_unit == 'kg' else 'kg' }}</button>
+            </form>
+        </div>
 
         <h2>Progress</h2>
         <p>Placeholder for progress charts and metrics. Implement as needed.</p>
