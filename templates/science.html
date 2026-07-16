@@ -1,27 +1,501 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
-    <title>Science - Ryan's workout tracker</title>
+    <title>Info</title>
     <style>
-        body{ font-family:sans-serif; background:#f4f4f9; padding:20px; }
-        .container{ max-width:700px; margin:auto; background:white; padding:20px; border-radius:8px; }
-        .top-nav{ display:flex; gap:8px; justify-content:center; margin-bottom:16px; }
-        .nav-btn{ background:#e9ecef; color:#333; padding:8px 12px; border-radius:6px; text-decoration:none; }
-        .nav-btn.active{ background:#007bff;color:white; }
+        body {
+            font-family: sans-serif;
+            background: #f4f4f9;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .site-title {
+            text-align: center;
+            padding: 18px;
+            background: white;
+            border-radius: 8px;
+            margin: 0 auto 16px auto;
+            max-width: 900px;
+            box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+
+            .site-title h1 {
+                margin: 0;
+                font-size: 22px;
+            }
+
+        .top-nav {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            background: #e9ecef;
+            color: #333;
+            padding: 8px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+        }
+
+            .nav-btn.active {
+                background: #007bff;
+                color: white;
+            }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        /* New styles for 1RM table + explanation */
+        .one-rm-section {
+            margin-top: 16px;
+        }
+
+        .one-rm-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+        }
+
+            .one-rm-table th, .one-rm-table td {
+                border: 1px solid #ddd;
+                padding: 6px 8px;
+                text-align: center;
+                font-size: 13px;
+            }
+
+            .one-rm-table th {
+                background: #f2f6fb;
+                font-weight: 600;
+            }
+
+            .one-rm-table thead th:first-child, .one-rm-table tbody td:first-child {
+                text-align: left;
+                background: #fafafa;
+                position: sticky;
+                left: 0;
+            }
+
+            .one-rm-table tbody tr:nth-child(even) {
+                background: #fafafa;
+            }
+        /* Relative intensity table */
+        .ri-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+
+            .ri-table th, .ri-table td {
+                border: 1px solid #ddd;
+                padding: 6px 8px;
+                text-align: center;
+            }
+
+            .ri-table thead th {
+                background: #f7f9fc;
+                font-weight: 700;
+            }
+            /* Ensure the first column inherits the row color and is on top when sticky so labels remain visible */
+            .ri-table td.first {
+                text-align: left;
+                font-weight: 700;
+                /* inherit row background and text color so band styles show through */
+                background: inherit;
+                color: inherit;
+                position: sticky;
+                left: 0;
+                z-index: 3; /* sit above neighboring cells */
+                padding-left: 8px;
+            }
+
+            .ri-table .percent {
+                width: 80px;
+            }
+
+        /* color bands */
+        .band-max {
+            background: #d92b20;
+            color: white;
+        }
+
+        .band-heavyplus {
+            background: #ff6b00;
+            color: white;
+        }
+
+        .band-heavy {
+            background: #ffcc00;
+            color: #222;
+        }
+
+        .band-modplus {
+            background: #ffd86b;
+            color: #222;
+        }
+
+        .band-mod {
+            background: #bfe86b;
+            color: #222;
+        }
+
+        .band-light {
+            background: #66c28d;
+            color: white;
+        }
+
+        .band-toolight {
+            background: #d7e3ef;
+            color: #222;
+        }
+
+        .recommend {
+            text-align: left;
+            padding-left: 8px;
+            width: 270px;
+        }
+
+        .explain {
+            margin-top: 18px;
+            padding: 14px;
+            border: 1px solid #e0e6ef;
+            background: #fbfdff;
+            border-radius: 6px;
+            line-height: 1.45;
+        }
+
+            .explain h4 {
+                margin: 0 0 8px 0;
+            }
+
+            .explain p {
+                margin: 6px 0;
+                color: #222;
+            }
+
+        .note {
+            color: #666;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        .explain-box {
+            margin-top: 14px;
+            padding: 12px;
+            border: 1px solid #e0e6ef;
+            background: #fbfdff;
+            border-radius: 6px;
+            color: #222;
+            font-size: 14px;
+            line-height: 1.45;
+        }
+
+        .note {
+            color: #666;
+            font-size: 13px;
+            margin-top: 6px;
+        }
+
+        /* Wilks tables */
+        .wilks-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .wilks-table {
+            border-collapse: collapse;
+            width: 48%;
+            min-width: 320px;
+        }
+
+            .wilks-table th, .wilks-table td {
+                border: 1px solid #ddd;
+                padding: 6px 8px;
+                text-align: center;
+            }
+
+            .wilks-table th {
+                background: #f3f6fb;
+                font-weight: 700;
+            }
+
+        .wilks-caption {
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+
+        .wilks-explain {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 6px;
+            background: #fbfdff;
+            border: 1px solid #e6edf5;
+        }
+
+        @media (max-width:820px) {
+            .wilks-table {
+                width: 100%;
+            }
+
+            .wilks-row {
+                flex-direction: column;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="title"><h1>Ryan's workout tracker</h1></div>
-        <div class="top-nav">
+    <header class="site-title">
+        <h1>Ryan's workout tracker</h1>
+        <nav class="top-nav" role="navigation" aria-label="top-navigation">
             <a class="nav-btn {% if selected_tab == 'progress' %}active{% endif %}" href="{{ url_for('progress') }}">Progress</a>
             <a class="nav-btn {% if selected_tab == 'log' %}active{% endif %}" href="{{ url_for('index') }}">Log workouts</a>
             <a class="nav-btn {% if selected_tab == 'science' %}active{% endif %}" href="{{ url_for('science') }}">Science</a>
             <a class="nav-btn {% if selected_tab == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">Profile</a>
-        </div>
+        </nav>
+    </header>
 
-        <h2>Science</h2>
-        <p>Placeholder for articles, references or explanations about intensity/tonnage calculations.</p>
-    </div>
+    <div class="container">
+        
+
+        <div class="one-rm-section" aria-labelledby="one-rm-heading">
+            <h3 id="one-rm-heading">Estimated One-Rep Max Table</h3>
+
+            <table class="one-rm-table" role="grid" aria-describedby="one-rm-desc">
+                <thead>
+                    <tr>
+                        <th>Reps \ Weight (lb)</th>
+                        {% for w in range(100, 201, 10) %}
+                        <th>{{ w }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in range(1, 11) %}
+                    <tr>
+                        <td><strong>{{ r }} rep{{ 's' if r > 1 else '' }}</strong></td>
+                        {% for w in range(100, 201, 10) %}
+                        {# Formula: 1RM = Weight * (1 + Reps / 30) #}
+                        {% set one_rm = (w * (1 + (r / 30.0))) %}
+                        <td>{{ (one_rm | round(0, 'common')) | int }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div id="one-rm-desc" class="explain-box" role="region" aria-label="one rep max explanation">
+                <strong>What is 1RM and how this table is calculated</strong>
+                <p>
+                    The one-repetition maximum (1RM) is an estimate of the maximum load a person can lift for one complete repetition.
+                    This table uses a common estimation formula:
+                    <code>1RM = Weight × (1 + Reps / 30)</code>.
+                    For example, 10 reps with 150 lb estimates 1RM ≈ 150 × (1 + 10/30) = 200 lb.
+                </p>
+                <p class="note">
+                    Use these estimates for programming and tracking progress. While they may not strictly predict real values,
+                    they are useful for comparing the difficulty of sets at different weights.
+                    Always prioritize technique and safety when testing maximal loads.
+                </p>
+            </div>
+
+            <div class="explain" aria-live="polite">
+                <h4>Tonnage</h4>
+                <p><strong>Tonnage</strong> is the total work performed, calculated on this site as the sum of (reps × weight) across sets for a session or day. Our graphs display one tonnage total for each day, however one rep max and relative intensity are only based on the most difficult set on a given day.</p>
+            </div>
+
+            <h2>Relative Intensity Table</h2>
+            <p>Percentages below represent approximate intensity (percentage of 1RM) for different rep values. Use as a programming guide.</p>
+
+            <table class="ri-table" role="grid" aria-label="Relative intensity table">
+                <thead>
+                    <tr>
+                        <th>Difficulty</th>
+                        <th class="percent">Abs. Intensity</th>
+                        <th>x1</th>
+                        <th>x2</th>
+                        <th>x3</th>
+                        <th>x4</th>
+                        <th>x5</th>
+                        <th>x6</th>
+                        <th>x8</th>
+                        <th>x10</th>
+                        <th class="recommend">Recommendations</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="band-max">
+                        <td class="first">MAX</td>
+                        <td>100.0%</td>
+                        <td>100%</td>
+                        <td>95%</td>
+                        <td>92.5%</td>
+                        <td>90%</td>
+                        <td>87.5%</td>
+                        <td>85%</td>
+                        <td>80%</td>
+                        <td>72.5%</td>
+                        <td class="recommend">True-test maximal sets. Use sparingly for testing or PR attempts.</td>
+                    </tr>
+
+                    <tr class="band-heavyplus">
+                        <td class="first">HEAVY +</td>
+                        <td>97.5%</td>
+                        <td>97.5%</td>
+                        <td>92.8%</td>
+                        <td>90.3%</td>
+                        <td>87.8%</td>
+                        <td>85.5%</td>
+                        <td>83%</td>
+                        <td>78%</td>
+                        <td>70.8%</td>
+                        <td class="recommend">Top-end work, occasional heavy sessions or testing blocks.</td>
+                    </tr>
+
+                    <tr class="band-heavy">
+                        <td class="first">HEAVY</td>
+                        <td>92.5%</td>
+                        <td>92.5%</td>
+                        <td>88%</td>
+                        <td>85.8%</td>
+                        <td>83.3%</td>
+                        <td>81%</td>
+                        <td>78.8%</td>
+                        <td>74%</td>
+                        <td>67.3%</td>
+                        <td class="recommend">Primary heavy work for strength development; lower volume, high intensity.</td>
+                    </tr>
+
+                    <tr class="band-modplus">
+                        <td class="first">MOD +</td>
+                        <td>87.5% / 85.0%</td>
+                        <td>87.5% / 85%</td>
+                        <td>83.3% / 80.8%</td>
+                        <td>81% / 78.8%</td>
+                        <td>78.8% / 76.5%</td>
+                        <td>76.8% / 74.5%</td>
+                        <td>74.5% / 72.3%</td>
+                        <td>70% / 68%</td>
+                        <td>63.5% / 61.8%</td>
+                        <td class="recommend">Moderate loads for building work capacity and technique; moderate volume.</td>
+                    </tr>
+
+                    <tr class="band-mod">
+                        <td class="first">MOD</td>
+                        <td>80.0% - 82.5%</td>
+                        <td>80% / 82.5%</td>
+                        <td>76% / 78.5%</td>
+                        <td>74% / 76.5%</td>
+                        <td>72% / 74.3%</td>
+                        <td>70% / 72.3%</td>
+                        <td>68% / 70.3%</td>
+                        <td>64% / 66%</td>
+                        <td>58% / 60%</td>
+                        <td class="recommend">Majority of base volume: build work capacity and reinforce movement patterning.</td>
+                    </tr>
+
+                    <tr class="band-light">
+                        <td class="first">LIGHT</td>
+                        <td>75.0% - 77.5%</td>
+                        <td>77.5% / 75%</td>
+                        <td>73.8% / 71.3%</td>
+                        <td>71.8% / 69.5%</td>
+                        <td>69.8% / 67.5%</td>
+                        <td>68% / 65.8%</td>
+                        <td>66% / 63.8%</td>
+                        <td>62% / 60%</td>
+                        <td>56.3% / 54.5%</td>
+                        <td class="recommend">Recovery, technique work, or high-repetition conditioning.</td>
+                    </tr>
+
+                    <tr class="band-toolight">
+                        <td class="first">TOO LIGHT</td>
+                        <td>65.0% - 72.5%</td>
+                        <td>72.5% / 70%</td>
+                        <td>69% / 66.5%</td>
+                        <td>67.3% / 64.8%</td>
+                        <td>65.3% / 63%</td>
+                        <td>63.5% / 61.3%</td>
+                        <td>61.8% / 59.5%</td>
+                        <td>58% / 56%</td>
+                        <td>52.8% / 50.8%</td>
+                        <td class="recommend">Used for deloads, warm-ups, or reconditioning. Not ideal for strength stimulus.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="wilks-row" role="region" aria-label="Wilks score tables">
+                <div>
+                    <div class="wilks-caption">Wilks score — Males (fixed lift: {{ fixed_weight if fixed_weight is defined else 300 }} lb, 1 rep)</div>
+                    <table class="wilks-table" role="grid" aria-label="Wilks male table">
+                        <thead>
+                            <tr><th>Bodyweight (lb)</th><th>Wilks score</th></tr>
+                        </thead>
+                        <tbody>
+                            {# Male Wilks coefficients from existing code #}
+                            {% set a = 47.46178854 %}
+                            {% set b = 8.472061379 %}
+                            {% set c = 0.07369410346 %}
+                            {% set d = -0.001395833811 %}
+                            {% set e = 0.00000707665973070743 %}
+                            {% set f = -0.0000000120804336482315 %}
+
+                            {# Convert the lifted weight from lbs to kg #}
+                            {% set fixed_weight = fixed_weight if fixed_weight is defined else 300 %}
+                            {% set fixed_weight_kg = fixed_weight / 2.20462262 %}
+
+                            {% for bw in range(100, 301, 10) %}
+                            {# Convert the lifter's bodyweight from lbs to kg #}
+                            {% set bw_kg = bw / 2.20462262 %}
+
+                            {# Use the kg variables to calculate the denominator #}
+                            {% set denom = a + b*bw_kg + c*(bw_kg**2) + d*(bw_kg**3) + e*(bw_kg**4) + f*(bw_kg**5) %}
+
+                            {% if denom != 0 %}
+                            {% set score = (fixed_weight_kg * 600.0) / denom %}
+                            {% else %}
+                            {% set score = 0 %}
+                            {% endif %}
+                            <tr><td>{{ bw }}</td><td>{{ (score | round(1, 'common')) }}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div>
+                </div>
+
+            </div>
+
+            <div class="wilks-explain" role="region" aria-label="Wilks explanation">
+                <h4>Wilks Score — formula & utility</h4>
+                <p>
+                    The Wilks score is a way to compare strength (total weight lifted) across lifters of different bodyweights by applying a coefficient calculated from the lifter's bodyweight.
+                    Each sex uses a set of coefficients in the polynomial denominator; the score is typically computed as:
+                </p>
+                <p><code>Wilks score = (weight_lifted) × (constant / polynomial(bodyweight))</code></p>
+                <p>
+                    In the table above we use a constant of 600 and the sex-specific polynomial coefficients embedded in the app (the same coefficients used elsewhere in this codebase).
+                    Higher Wilks scores indicate more strength relative to bodyweight.
+                </p>
+                <p class="note">
+                    Utility: use Wilks to compare performances between lifters of different sizes, to track relative strength improvements, or to normalise progress when bodyweight changes.
+                    Remember Wilks is an estimate — competition federations may use updated scoring formulas (e.g., IPF points). Treat Wilks as a comparison tool, not an absolute measure of ability.
+                </p>
+            </div>
+        </div>
 </body>
 </html>

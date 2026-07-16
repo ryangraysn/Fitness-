@@ -75,7 +75,8 @@ def calculate_and_fill_relative_intensities(user_table_name: str,
                         f * bw ** 5
                     )
                     if denominator != 0:
-                        wilks_relative_intensity = int(round(relative_intensity * 600 / denominator))
+                        # Use the actual one-rep-max (weight) when computing Wilks
+                        wilks_relative_intensity = int(round(float(one_rep_max) * 600.0 / float(denominator)))
 
                 elif g == 'female':
                     # Wilks coefficients (female)
@@ -94,7 +95,8 @@ def calculate_and_fill_relative_intensities(user_table_name: str,
                         f * bw ** 5
                     )
                     if denominator != 0:
-                        wilks_relative_intensity = int(round(relative_intensity * 600 / denominator))
+                        # Use the actual one-rep-max (weight) when computing Wilks
+                        wilks_relative_intensity = int(round(float(one_rep_max) * 600.0 / float(denominator)))
 
             # Persist updates for this row
             conn.execute(

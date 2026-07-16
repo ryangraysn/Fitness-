@@ -7,10 +7,31 @@
             font-family: sans-serif;
             background: #f4f4f9;
             padding: 20px;
+            margin: 0;
         }
 
+        /* Site title section (shared) */
+        .site-title {
+            text-align: center;
+            padding: 18px;
+            background: white;
+            border-radius: 8px;
+            margin: 0 auto 16px auto;
+            max-width: 900px;
+            box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+
+            .site-title h1 {
+                margin: 0;
+                font-size: 22px;
+            }
+
         .container {
-            max-width: 700px;
+            max-width: 900px;
             margin: auto;
             background: white;
             padding: 20px;
@@ -26,7 +47,7 @@
             display: flex;
             gap: 8px;
             justify-content: center;
-            margin-bottom: 16px;
+            flex-wrap: wrap;
         }
 
         .nav-btn {
@@ -64,6 +85,16 @@
             cursor: pointer;
             border-radius: 4px;
         }
+
+        /* Specific style for the Log Workout form button */
+        .log-btn {
+            background: #007bff;
+        }
+
+            .log-btn:disabled {
+                background: #cccccc;
+                cursor: not-allowed;
+            }
 
         /* Movement buttons row */
         .movement-row {
@@ -148,18 +179,17 @@
     </style>
 </head>
 <body>
-
-    <div class="container">
-        <div class="title">
-            <h1>Ryan's workout tracker</h1>
-        </div>
-
-        <div class="top-nav" role="navigation" aria-label="top-navigation">
+    <header class="site-title">
+        <h1>Ryan's workout tracker</h1>
+        <nav class="top-nav" role="navigation" aria-label="top-navigation">
             <a class="nav-btn {% if selected_tab == 'progress' %}active{% endif %}" href="{{ url_for('progress') }}">Progress</a>
-            <a class="nav-btn {% if selected_tab == 'log' %}active{% endif %}" href="{{ url_for('index') }}{% if selected_movement %}?m={{ selected_movement.id }}{% endif %}">Log workouts</a>
+            <a class="nav-btn active" href="{{ url_for('index') }}">Log workouts</a>
             <a class="nav-btn {% if selected_tab == 'science' %}active{% endif %}" href="{{ url_for('science') }}">Science</a>
             <a class="nav-btn {% if selected_tab == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">Profile</a>
-        </div>
+        </nav>
+    </header>
+
+    <div class="container">
 
         <div class="header">
             <h2>{{ username }}'s Workouts</h2>
@@ -207,7 +237,7 @@
             <label>Reps</label> <input type="number" name="Reps" required {{ 'disabled' if not selected_movement }}>
             <label>Weight</label> <input type="number" name="Weight" required {{ 'disabled' if not selected_movement }}>
             <label>Body Weight</label> <input type="number" name="Body_Weight" required {{ 'disabled' if not selected_movement }}>
-            <button type="submit" {{ 'disabled' if not selected_movement }}>Log Workout</button>
+            <button type="submit" class="log-btn" {{ 'disabled' if not selected_movement }}>Log Workout</button>
         </form>
 
         <div class="graph-container">

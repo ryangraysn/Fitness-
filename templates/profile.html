@@ -1,24 +1,77 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Profile - Ryan's workout tracker</title>
+    <title>Profile</title>
     <style>
-        body{ font-family:sans-serif; background:#f4f4f9; padding:20px; }
-        .container{ max-width:700px; margin:auto; background:white; padding:20px; border-radius:8px; }
-        .top-nav{ display:flex; gap:8px; justify-content:center; margin-bottom:16px; }
-        .nav-btn{ background:#e9ecef; color:#333; padding:8px 12px; border-radius:6px; text-decoration:none; }
-        .nav-btn.active{ background:#007bff;color:white; }
+        body {
+            font-family: sans-serif;
+            background: #f4f4f9;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .site-title {
+            text-align: center;
+            padding: 18px;
+            background: white;
+            border-radius: 8px;
+            margin: 0 auto 16px auto;
+            max-width: 900px;
+            box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+
+            .site-title h1 {
+                margin: 0;
+                font-size: 22px;
+            }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .top-nav {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .nav-btn {
+            background: #e9ecef;
+            color: #333;
+            padding: 8px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+        }
+
+            .nav-btn.active {
+                background: #007bff;
+                color: white;
+            }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="title"><h1>Ryan's workout tracker</h1></div>
-        <div class="top-nav">
+    <header class="site-title">
+        <h1>Ryan's workout tracker</h1>
+        <nav class="top-nav" role="navigation" aria-label="top-navigation">
             <a class="nav-btn {% if selected_tab == 'progress' %}active{% endif %}" href="{{ url_for('progress') }}">Progress</a>
             <a class="nav-btn {% if selected_tab == 'log' %}active{% endif %}" href="{{ url_for('index') }}">Log workouts</a>
             <a class="nav-btn {% if selected_tab == 'science' %}active{% endif %}" href="{{ url_for('science') }}">Science</a>
             <a class="nav-btn {% if selected_tab == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">Profile</a>
-        </div>
+        </nav>
+    </header>
+
+    <div class="container">
+
 
         <h2>Profile</h2>
         <p>Placeholder for user profile settings, bodyweight, gender and other preferences.</p>
