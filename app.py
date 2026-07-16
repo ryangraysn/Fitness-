@@ -14,6 +14,34 @@ import re
 app = Flask(__name__)
 app.secret_key = "super_secret_key_change_this_in_production" # Required for sessions
 
+WEIGHT_UNIT_KG = "kg"
+WEIGHT_UNIT_LBS = "lbs"
+
+
+def get_weight_unit():
+    unit = session.get("weight_unit", WEIGHT_UNIT_KG)
+    if unit not in {WEIGHT_UNIT_KG, WEIGHT_UNIT_LBS}:
+        unit = WEIGHT_UNIT_KG
+    return unit
+
+
+def convert_weight_to_display(value, unit):
+    if value is None:
+        return None
+    value = float(value)
+    if unit == WEIGHT_UNIT_LBS:
+        return round(value * 2.20462, 2)
+    return round(value, 2)
+
+
+def convert_weight_to_storage(value, unit):
+    if value is None:
+        return None
+    value = float(value)
+    if unit == WEIGHT_UNIT_LBS:
+        return round(value / 2.20462, 2)
+    return round(value, 2)
+
 # --- Database Setup ---
 DB_URL = 'sqlite:///Fitness_Database.db'
 engine = create_engine(DB_URL)
@@ -95,6 +123,47 @@ def load_movement_table(table_name: str):
         # If autoload fails, create it (fallback)
         return ensure_movement_table(table_name)
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        action = request.form.get("action", "login")
+
+        with engine.connect() as conn:
+            user = conn.execute(select(users_table).where(users_table.c.username == username)).fetchone()
+
+        if action == "register":
+            if user:
+                flash("Username already exists.", "error")
+                return redirect(url_for("login"))
+            if not username or not password:
+                flash("Username and password are required.", "error")
+                return redirect(url_for("login"))
+            password_hash = generate_password_hash(password)
+            with engine.begin() as conn:
+                conn.execute(insert(users_table).values(username=username, password_hash=password_hash))
+            flash("Account created. Please log in.", "success")
+            return redirect(url_for("login"))
+
+        if not user or not check_password_hash(user.password_hash, password):
+            flash("Invalid username or password.", "error")
+            return redirect(url_for("login"))
+
+        session["user_id"] = user.id
+        session["username"] = user.username
+        session["weight_unit"] = WEIGHT_UNIT_KG
+        flash("Logged in successfully.", "success")
+        return redirect(url_for("index"))
+
+    return render_template("login.html", selected_tab='login')
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("Logged out.", "success")
+    return redirect(url_for("login"))
+
 @app.route("/create_movement", methods=["POST"])
 def create_movement():
     if "user_id" not in session:
@@ -149,6 +218,18 @@ def delete_movement():
     flash("Movement deleted.", "success")
     return redirect(url_for("index"))
 
+@app.route("/set_weight_unit", methods=["POST"])
+def set_weight_unit():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    selected_unit = request.form.get("unit", "").strip().lower()
+    if selected_unit not in {WEIGHT_UNIT_KG, WEIGHT_UNIT_LBS}:
+        selected_unit = WEIGHT_UNIT_KG
+
+    session["weight_unit"] = selected_unit
+    return redirect(request.referrer or url_for("index"))
+
 @app.route("/tonnage_plot")
 def tonnage_plot():
     # Only allow logged-in users to fetch their plot
@@ -173,6 +254,8 @@ def tonnage_plot():
         except Exception:
             rows = []
 
+    current_unit = get_weight_unit()
+
     # Build structured list with parsed dates so we can find the PB set's date easily
     entries = []
     for r in rows:
@@ -190,9 +273,9 @@ def tonnage_plot():
         entries.append({
             "id": r.id,
             "dt": dt,
-            "tonnage": (int(r.Tonnage) if r.Tonnage is not None else None),
+            "tonnage": (convert_weight_to_display(r.Tonnage, current_unit) if r.Tonnage is not None else None),
             "rel_int": (int(r.Relative_Intensity) if r.Relative_Intensity is not None else None),
-            "one_rm": (int(r.One_Rep_Max) if r.One_Rep_Max is not None else None)
+            "one_rm": (convert_weight_to_display(r.One_Rep_Max, current_unit) if r.One_Rep_Max is not None else None)
         })
 
     # Separate lists for plotting
@@ -216,14 +299,13 @@ def tonnage_plot():
     plt.figure(figsize=(8, 3.5))
     if not dates_t and not dates_r:
         plt.text(0.5, 0.5, "No tonnage or relative intensity data", horizontalalignment='center', verticalalignment='center', fontsize=14)
-        plt.axis('off'
-                  '')
+        plt.axis('off')
     else:
         ax = plt.gca()
         if dates_t:
             ax.plot(dates_t, tonnages, marker='o', linestyle='-', color='#2b7a78', label='Tonnage')
             ax.fill_between(dates_t, tonnages, color='#95d5b2', alpha=0.3)
-            ax.set_ylabel("Tonnage (Reps x Weight)")
+            ax.set_ylabel(f"Tonnage ({current_unit.upper()})")
         ax.set_xlabel("Date")
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
         plt.xticks(rotation=45, ha='right')
@@ -270,12 +352,11 @@ def index():
     if "user_id" not in session:
         return redirect(url_for("login"))
 
-    # load user's movements and profile body weight
+    current_unit = get_weight_unit()
+
+    # load user's movements
     with engine.connect() as conn:
         movements = conn.execute(select(movements_table).where(movements_table.c.user_id == session["user_id"])).fetchall()
-        user_row = conn.execute(select(users_table.c.body_weight).where(users_table.c.id == session["user_id"])).fetchone()
-
-    body_weight = user_row.body_weight if user_row and user_row.body_weight is not None else ""
 
     # find selected movement id from query param or default to first movement
     selected_movement_id = request.args.get("m", type=int)
@@ -313,16 +394,11 @@ def index():
         try:
             reps = int(request.form.get("Reps"))
             weight = int(request.form.get("Weight"))
+            body_weight = int(request.form.get("Body_Weight"))
+            if current_unit == WEIGHT_UNIT_LBS:
+                weight = int(round(convert_weight_to_storage(weight, current_unit)))
+                body_weight = int(round(convert_weight_to_storage(body_weight, current_unit)))
             date_str = request.form.get("Date")
-
-            # Attempt to parse body weight from form; if not present or invalid, fallback to user's profile value
-            raw_body_weight = request.form.get("Body_Weight", "")
-            body_weight_val = None
-            if raw_body_weight is not None and str(raw_body_weight).strip() != "":
-                try:
-                    body_weight_val = int(float(raw_body_weight))
-                except Exception:
-                    body_weight_val = None
 
             per_set_tonnage = reps * weight
             one_rm = int(round(weight * (1 + (reps / 30.0))))
@@ -331,16 +407,6 @@ def index():
             # Use a transaction so insert + update are committed
             with engine.begin() as conn:
                 t = load_movement_table(table_name)
-
-                # If form did not provide body weight, fetch from user's profile
-                if body_weight_val is None:
-                    user_row = conn.execute(select(users_table.c.body_weight).where(users_table.c.id == session["user_id"])).fetchone()
-                    if user_row and user_row.body_weight is not None:
-                        try:
-                            body_weight_val = int(user_row.body_weight)
-                        except Exception:
-                            body_weight_val = None
-
                 pb_stmt = select(func.max(t.c.One_Rep_Max)).where(t.c.user_id == session["user_id"])
                 pb_result = conn.execute(pb_stmt).scalar()
                 PB_1rm = None if pb_result is None else pb_result
@@ -360,7 +426,7 @@ def index():
                     "Set": set_val,
                     "Reps": reps,
                     "Weight": weight,
-                    "Body_Weight": body_weight_val,
+                    "Body_Weight": body_weight,
                     "Date": date_str,
                     "Tonnage": per_set_tonnage,
                     "One_Rep_Max": one_rm,
@@ -393,7 +459,7 @@ def index():
             return redirect(url_for("index", m=movement_id))
 
     # GET: render page (workouts loaded above)
-    return render_template("index.html", workouts=workouts, username=session["username"], movements=movements, selected_movement=selected_movement, selected_tab='log', body_weight=body_weight)
+    return render_template("index.html", workouts=workouts, username=session["username"], movements=movements, selected_movement=selected_movement, weight_unit=current_unit)
 
 @app.route("/delete_set", methods=["POST"])
 def delete_set():
@@ -465,29 +531,33 @@ def delete_set():
 def progress():
     if "user_id" not in session:
         return redirect(url_for("login"))
+    current_unit = get_weight_unit()
     with engine.connect() as conn:
         movements = conn.execute(select(movements_table).where(movements_table.c.user_id == session["user_id"])).fetchall()
-    return render_template("progress.html", username=session["username"], movements=movements, selected_tab='progress', selected_movement=None)
+    return render_template("progress.html", username=session["username"], movements=movements, selected_tab='progress', selected_movement=None, weight_unit=current_unit)
 
 @app.route("/science")
 def science():
     if "user_id" not in session:
         return redirect(url_for("login"))
+    current_unit = get_weight_unit()
     with engine.connect() as conn:
         movements = conn.execute(select(movements_table).where(movements_table.c.user_id == session["user_id"])).fetchall()
-    return render_template("science.html", username=session["username"], movements=movements, selected_tab='science', selected_movement=None)
+    return render_template("science.html", username=session["username"], movements=movements, selected_tab='science', selected_movement=None, weight_unit=current_unit)
 
 @app.route("/profile", methods=["GET", "POST"])
 def profile():
     if "user_id" not in session:
         return redirect(url_for("login"))
 
+    current_unit = get_weight_unit()
+
     with engine.connect() as conn:
         movements = conn.execute(select(movements_table).where(movements_table.c.user_id == session["user_id"])).fetchall()
         user_row = conn.execute(select(users_table.c.gender, users_table.c.body_weight).where(users_table.c.id == session["user_id"])).fetchone()
 
     gender = user_row.gender if user_row and user_row.gender else ""
-    body_weight = user_row.body_weight if user_row and user_row.body_weight is not None else ""
+    body_weight = convert_weight_to_display(user_row.body_weight, current_unit) if user_row and user_row.body_weight is not None else ""
 
     if request.method == "POST":
         selected_gender = request.form.get("gender", "").strip().lower()
@@ -497,7 +567,7 @@ def profile():
         raw_body_weight = request.form.get("body_weight", "").strip()
         if raw_body_weight:
             try:
-                body_weight_value = int(float(raw_body_weight))
+                body_weight_value = int(round(convert_weight_to_storage(float(raw_body_weight), current_unit)))
             except ValueError:
                 flash("Body weight must be a number.", "error")
                 body_weight_value = None
@@ -522,6 +592,7 @@ def profile():
         selected_movement=None,
         gender=gender,
         body_weight=body_weight,
+        weight_unit=current_unit,
     )
 
 if __name__ == "__main__":
